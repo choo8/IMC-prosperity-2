@@ -12,6 +12,21 @@ class Trader:
         "STARFRUIT": 0
     }
 
+    # Linear regression parameters trained on data from days -2, -1 and 0
+    starfruit_coef = [0.19276398, 0.22111366, 0.24350053, 0.34038018]
+    starfruit_intercept = 11.302935408693884
+
+    # Cache latest 4 midprice of best_ask and best_bid every iteration
+    starfruit_cache = []
+
+    def compute_starfruit_price(self):
+        price = self.starfruit_intercept
+        
+        for idx, cached_price in enumerate(self.starfruit_cache):
+            price += self.starfruit_coef[idx] * cached_price
+        
+        return int(round(price))
+
     def run(self, state: TradingState):
         # Update positions
         for product, position in state.position.items():
@@ -23,25 +38,24 @@ class Trader:
             order_depth: OrderDepth = state.order_depths[product]
             orders: List[Order] = []
 
+            best_market_ask = min(order_depth.sell_orders.keys())
+            best_market_bid = max(order_depth.buy_orders.keys())
+            
+            market_price = (best_market_ask + best_market_bid) / 2
+
             if product == "AMETHYSTS":
                 acceptable_price = 10000  # Eyeball graph
 
-                best_market_ask = min(order_depth.sell_orders.keys())
-                best_market_bid = max(order_depth.buy_orders.keys())
-
                 cur_position = self.positions[product]
 
-                # Construct buy orders
+                # Market make
                 for ask, vol in order_depth.sell_orders.items():
                     # Check if asking price is below 
                     if ((ask < acceptable_price) or ((self.positions[product] < 0) and (ask == acceptable_price))) and cur_position < self.POSITION_LIMITS[product]:
                         order_vol = min(-vol, self.POSITION_LIMITS[product] - cur_position)
                         cur_position += order_vol
-                        print("BUY", str(order_vol) + "x", ask)
+                        print("BUY", product, str(order_vol) + "x", ask)
                         orders.append(Order(product, ask, order_vol))
-
-                market_price = (best_market_ask + best_market_bid) / 2
-                own_price = acceptable_price
 
                 # Derived from actual AMETHYSTS prices from previous iteration
                 undercut_market_ask = best_market_ask - 1
@@ -51,7 +65,7 @@ class Trader:
                 own_ask = max(undercut_market_ask, acceptable_price + 1)
                 own_bid = min(undercut_market_bid, acceptable_price - 1)
 
-                # If position limits are not yet hit, try to buy more
+                # Market take
                 if cur_position < self.POSITION_LIMITS[product]:
                     # Current position is short
                     if self.positions[product] < 0:
@@ -67,19 +81,20 @@ class Trader:
 
                     order_vol = min(self.POSITION_LIMITS[product], self.POSITION_LIMITS[product] - cur_position)
                     cur_position += order_vol
-                    print("BUY", str(order_vol) + "x", ask)
+                    print("BUY", product, str(order_vol) + "x", ask)
                     orders.append(Order(product, ask, order_vol))
 
                 cur_position = self.positions[product]
         
-                # Construct sell orders
+                # Market make
                 for bid, vol in order_depth.buy_orders.items():
                     if ((bid > acceptable_price) or ((self.positions[product] > 0) and (bid == acceptable_price))) and cur_position > -self.POSITION_LIMITS[product]:
                         order_vol = max(-vol, -self.POSITION_LIMITS[product] - cur_position)
                         cur_position += order_vol
-                        print("SELL", str(order_vol) + "x", bid)
+                        print("SELL", product, str(order_vol) + "x", bid)
                         orders.append(Order(product, bid, order_vol))
                 
+                # Market take
                 if cur_position > -self.POSITION_LIMITS[product]:
                     if self.positions[product] < 0:
                         bid = max(undercut_market_ask - 1, acceptable_price + 1)
@@ -90,51 +105,67 @@ class Trader:
 
                     order_vol = max(-self.POSITION_LIMITS[product], -self.POSITION_LIMITS[product] - cur_position)
                     cur_position += order_vol
-                    print("SELL", str(order_vol) + "x", bid)
+                    print("SELL", product, str(order_vol) + "x", bid)
                     orders.append(Order(product, bid, order_vol))
 
             elif product == "STARFRUIT":
-                acceptable_price = 5030 + (state.timestamp * 0.00025)
-                spread = 0
+                # Pop oldest value from starfruit_cache if full
+                if len(self.starfruit_cache) == 4:
+                    self.starfruit_cache.pop(0)
 
-                if len(order_depth.sell_orders) != 0:
-                    ask_fp = acceptable_price - spread
-                    best_ask = min(order_depth.sell_orders.keys())
-                    best_ask_vol = order_depth.sell_orders[best_ask]
-                    
-                    if best_ask <= ask_fp:
-                        if self.positions[product] == self.POSITION_LIMITS[product]:
-                            break
+                # Cache STARFRUIT prices
+                self.starfruit_cache.append(market_price)
+                # print(self.starfruit_cache)
 
-                        if self.positions[product] - best_ask_vol <= self.POSITION_LIMITS[product]:
-                            print("BUY", str(-best_ask_vol) + "x", best_ask)
-                            orders.append(Order(product, best_ask, -best_ask_vol))
-                            self.positions[product] += -best_ask_vol
-                        else:
-                            max_vol = self.POSITION_LIMITS[product] - self.positions[product]
-                            print("BUY", str(-max_vol) + "x", best_ask)
-                            orders.append(Order(product, best_ask, -max_vol))
-                            self.positions[product] += max_vol
-        
-                if len(order_depth.buy_orders) != 0:
-                    bid_fp = acceptable_price + spread
+                # Estimate price via linear regression
+                if len(self.starfruit_cache) == 4:
+                    acceptable_price = self.compute_starfruit_price()
+                    # print(acceptable_price)
+                    lower_bound = acceptable_price - 1
+                    upper_bound = acceptable_price + 1
+                else:
+                    lower_bound = -int(1e9)
+                    upper_bound = int(1e9)
 
-                    best_bid = max(order_depth.buy_orders.keys())
-                    best_bid_vol = order_depth.buy_orders[best_bid]
+                cur_position = self.positions[product]
 
-                    if best_bid >= bid_fp:
-                        if self.positions[product] == -self.POSITION_LIMITS[product]:
-                            break
+                # Construct buy orders
+                for ask, vol in order_depth.sell_orders.items():
+                    if ((ask <= lower_bound) or ((self.positions[product] < 0) and ask == lower_bound + 1)) and cur_position < self.POSITION_LIMITS[product]:
+                        order_vol = min(-vol, self.POSITION_LIMITS[product] - cur_position)
+                        cur_position += order_vol
+                        print("BUY", product, str(order_vol) + "x", ask)
+                        orders.append(Order(product, ask, order_vol))
 
-                        if self.positions[product] - best_bid_vol >= -self.POSITION_LIMITS[product]:
-                            print("SELL", str(best_bid_vol) + "x", best_bid)
-                            orders.append(Order(product, best_bid, -best_bid_vol))
-                            self.positions[product] += -best_bid_vol
-                        else:
-                            max_vol = self.positions[product] + self.POSITION_LIMITS[product]
-                            print("SELL", str(max_vol) + "x", best_bid)
-                            orders.append(Order(product, best_bid, -max_vol))
-                            self.positions[product] += -max_vol
+                undercut_market_ask = best_market_ask - 1
+                undercut_market_bid = best_market_bid + 1
+
+                # Spread = 1
+                own_ask = max(undercut_market_ask, lower_bound)
+                own_bid = min(undercut_market_bid, upper_bound)
+
+                # Market take
+                # if cur_position < self.POSITION_LIMITS[product]:
+                #     order_vol = self.POSITION_LIMITS[product] - cur_position    
+                #     cur_position += order_vol
+                #     print("BUY", product, str(order_vol) + "x", own_ask)
+                #     orders.append(Order(product, own_ask, order_vol))
+
+                cur_position = self.positions[product]
+
+                # Construct sell orders
+                for bid, vol in order_depth.buy_orders.items():
+                    if ((bid >= upper_bound) or (self.positions[product] > 0) and (bid == upper_bound - 1)) and cur_position > -self.POSITION_LIMITS[product]:
+                        order_vol = max(-vol, -self.POSITION_LIMITS[product] - cur_position)
+                        cur_position += order_vol
+                        print("SELL", product, str(order_vol) + "x", bid)
+                        orders.append(Order(product, bid, order_vol))
+
+                # if cur_position > -self.POSITION_LIMITS[product]:
+                #     order_vol = max(-self.POSITION_LIMITS[product], -self.POSITION_LIMITS[product] - cur_position)
+                #     cur_position += order_vol
+                #     print("SELL", product, str(order_vol) + "x", own_bid)
+                #     orders.append(Order(product, own_bid, order_vol))
 
             result[product] = orders
     
