@@ -64,7 +64,7 @@ class Trader:
             self.positions[product] = position
 
         # initialize the caches
-        self.unmarshalTraderData()
+        self.unmarshalTraderData(state)
 
         result = {}
 
@@ -170,6 +170,7 @@ class Trader:
                     lower_bound = acceptable_price - 1
                     upper_bound = acceptable_price + 1
                 else:
+                    # spread = int(1e9)
                     lower_bound = -int(1e9)
                     upper_bound = int(1e9)
 
@@ -188,15 +189,15 @@ class Trader:
                 undercut_market_bid = best_market_bid + 1
 
                 # Spread = 1
-                own_ask = max(undercut_market_ask, lower_bound)
-                own_bid = min(undercut_market_bid, upper_bound)
+                own_ask = max(undercut_market_ask, upper_bound)
+                own_bid = min(undercut_market_bid, lower_bound)
 
                 # Market take
-                if cur_position < self.POSITION_LIMITS[product]:
-                    order_vol = self.POSITION_LIMITS[product] - cur_position    
-                    cur_position += order_vol
-                    print("BUY", product, str(order_vol) + "x", own_ask)
-                    orders.append(Order(product, own_ask, order_vol))
+                # if cur_position < self.POSITION_LIMITS[product]:
+                #     order_vol = self.POSITION_LIMITS[product] - cur_position
+                #     cur_position += order_vol
+                #     print("BUY", product, str(order_vol) + "x", own_bid)
+                #     orders.append(Order(product, own_bid, order_vol))
 
                 cur_position = self.positions[product]
 
@@ -209,11 +210,11 @@ class Trader:
                         print("SELL", product, str(order_vol) + "x", bid)
                         orders.append(Order(product, bid, order_vol))
 
-                if cur_position > -self.POSITION_LIMITS[product]:
-                    order_vol = max(-self.POSITION_LIMITS[product], -self.POSITION_LIMITS[product] - cur_position)
-                    cur_position += order_vol
-                    print("SELL", product, str(order_vol) + "x", own_bid)
-                    orders.append(Order(product, own_bid, order_vol))
+                # if cur_position > -self.POSITION_LIMITS[product]:
+                #     order_vol = max(-self.POSITION_LIMITS[product], -self.POSITION_LIMITS[product] - cur_position)
+                #     cur_position += order_vol
+                #     print("SELL", product, str(order_vol) + "x", own_ask)
+                #     orders.append(Order(product, own_ask, order_vol))
 
             result[product] = orders
     
