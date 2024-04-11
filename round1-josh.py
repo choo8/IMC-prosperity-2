@@ -26,8 +26,8 @@ class Trader:
         ask_vol, bid_vol = 0, 0
 
         for ask, vol in order_depth.sell_orders.items():
-            total_ask += ask * vol
-            ask_vol += vol
+            total_ask += ask * abs(vol)
+            ask_vol += abs(vol)
 
         for bid, vol in order_depth.buy_orders.items():
             total_bid += bid * vol
@@ -60,8 +60,8 @@ class Trader:
             best_market_ask = min(order_depth.sell_orders.keys())
             best_market_bid = max(order_depth.buy_orders.keys())
             
-            market_price = (best_market_ask + best_market_bid) / 2
-            # market_price = self.compute_vwap(order_depth)
+            # market_price = (best_market_ask + best_market_bid) / 2
+            market_price = self.compute_vwap(order_depth)
 
             if product == "AMETHYSTS":
                 acceptable_price = 10000  # Eyeball graph
