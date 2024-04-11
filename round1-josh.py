@@ -1,5 +1,6 @@
 from datamodel import OrderDepth, UserId, TradingState, Order
 from typing import List
+import json
 import statistics
 
 class Trader:
@@ -46,10 +47,24 @@ class Trader:
         
         return int(round(price))
 
+    def marshalTraderData(self) -> str: 
+        return json.dumps({"starfruit_cache": self.starfruit_cache, "starfruit_spread_cache": self.starfruit_spread_cache})
+
+    def unmarshalTraderData(self, state: TradingState): 
+        if not state.traderData:
+            state.traderData = json.dumps({"starfruit_cache": [], "starfruit_spread_cache": []})
+        
+        traderDataDict = json.loads(state.traderData)
+        self.starfruit_cache = traderDataDict["starfruit_cache"]
+        self.starfruit_spread_cache = traderDataDict["starfruit_spread_cache"]
+
     def run(self, state: TradingState):
         # Update positions
         for product, position in state.position.items():
             self.positions[product] = position
+
+        # initialize the caches
+        self.unmarshalTraderData()
 
         result = {}
 
@@ -202,7 +217,7 @@ class Trader:
 
             result[product] = orders
     
-        traderData = "SAMPLE" # String value holding Trader state data required. It will be delivered as TradingState.traderData on next execution.
+        traderData = self.marshalTraderData()
         
         conversions = 1
         return result, conversions, traderData
