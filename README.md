@@ -10,3 +10,7 @@ Implementation of various trading strategies used in IMC Trading's "Prosperity 2
     - Manual: 1375th
     - Algorithmic: 500th
     - Overall: 659th
+* Round 3
+    - Manual: 579th
+    - Algorithmic: 516th
+    - Overall: 496th
