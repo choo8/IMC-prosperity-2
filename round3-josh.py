@@ -50,6 +50,12 @@ class Trader:
 
     etf_returns = []
     assets_returns = []
+    chocolate_returns = []
+    chocolate_estimated_returns = []
+    strawberries_returns = []
+    strawberries_estimated_returns = []
+    roses_returns = []
+    roses_estimated_returns = []
 
     def compute_vwap(self, order_depth):
         total_ask, total_bid = 0, 0
@@ -158,7 +164,7 @@ class Trader:
 
     def compute_basket_orders2(self, state: TradingState):
         products = ["CHOCOLATE", "STRAWBERRIES", "ROSES", "GIFT_BASKET"]
-        positions, buy_orders, sell_orders, best_bids, best_asks, prices, orders = {}, {}, {}, {}, {}, {}, {"GIFT_BASKET": []}
+        positions, buy_orders, sell_orders, best_bids, best_asks, prices, orders = {}, {}, {}, {}, {}, {}, {"CHOCOLATE": [], "STRAWBERRIES": [], "ROSES": [], "GIFT_BASKET": []}
 
         for product in products:
             positions[product] = state.position[product] if product in state.position else 0
@@ -187,10 +193,36 @@ class Trader:
         assets_rolling_mean = statistics.fmean(self.assets_returns[-10:])
         assets_rolling_std = statistics.stdev(self.assets_returns[-10:])
 
-        etf_z_score = (self.etf_returns[-1] - etf_rolling_mean) / etf_rolling_std
-        assets_z_score = (self.assets_returns[-1] - assets_rolling_mean) / assets_rolling_std
+        if etf_rolling_std != 0:
+            etf_z_score = (self.etf_returns[-1] - etf_rolling_mean) / etf_rolling_std
+        else:
+            etf_z_score = 0
+        if assets_rolling_std != 0:
+            assets_z_score = (self.assets_returns[-1] - assets_rolling_mean) / assets_rolling_std
+        else:
+            assets_z_score = 0
 
         z_score_diff = etf_z_score - assets_z_score
+
+        # for ask, vol in sell_orders["GIFT_BASKET"].items():
+        #     if etf_rolling_std != 0:
+        #         etf_z_score = (ask - etf_rolling_mean) / etf_rolling_std
+        #     else:
+        #         etf_z_score = 0
+
+        #     if etf_z_score - assets_z_score < -2:
+        #         print("BUY", "GIFT_BASKET", str(vol) + "x", ask)
+        #         orders["GIFT_BASKET"].append(Order("GIFT_BASKET", ask, vol))
+
+        # for bid, vol in buy_orders["GIFT_BASKET"].items():
+        #     if etf_rolling_std != 0:
+        #         etf_z_score = (bid - etf_rolling_mean) / etf_rolling_std
+        #     else:
+        #         etf_z_score = 0
+
+        #     if etf_z_score - assets_z_score > 2:
+        #         print("SELL", "GIFT_BASKET", str(vol) + "x", bid)
+        #         orders["GIFT_BASKET"].append(Order("GIFT_BASKET", bid, -vol))
 
         # GIFT_BASKET undervalued
         if z_score_diff < -2:
@@ -200,7 +232,13 @@ class Trader:
             roses_best_bid_vol = buy_orders["ROSES"][best_bids["ROSES"]]
 
             limit_mult = min(-etf_best_ask_vol, round(chocolate_best_bid_vol / 4), round(strawberries_best_bid_vol / 6), roses_best_bid_vol)
+            # if limit_mult == 0:
+            #     limit_mult = -etf_best_ask_vol
+            limit_mult = round(limit_mult * abs(z_score_diff) / 2)
 
+            limit_mult = min(limit_mult, self.POSITION_LIMITS["GIFT_BASKET"] - positions["GIFT_BASKET"], self.POSITION_LIMITS["GIFT_BASKET"])
+
+            print("GIFT_BASKET positions:", positions["GIFT_BASKET"])
             print("BUY", "GIFT_BASKET", str(limit_mult) + "x", best_asks["GIFT_BASKET"])
             orders["GIFT_BASKET"].append(Order("GIFT_BASKET", best_asks["GIFT_BASKET"], limit_mult))
         # GIFT_BASKET overvalued
@@ -211,18 +249,193 @@ class Trader:
             roses_best_ask_vol = sell_orders["ROSES"][best_asks["ROSES"]]
 
             limit_mult = min(etf_best_bid_vol, round(-chocolate_best_ask_vol / 4), round(-strawberries_best_ask_vol / 6), -roses_best_ask_vol)
+            # if limit_mult == 0:
+            #     limit_mult = etf_best_bid_vol
+            limit_mult = round(-limit_mult * abs(z_score_diff) / 2)
             
+            limit_mult = max(limit_mult, -self.POSITION_LIMITS["GIFT_BASKET"] - positions["GIFT_BASKET"], -self.POSITION_LIMITS["GIFT_BASKET"])
+
+            print("GIFT_BASKET positions:", positions["GIFT_BASKET"])
             print("SELL", "GIFT_BASKET", str(limit_mult) + "x", best_bids["GIFT_BASKET"])
-            orders["GIFT_BASKET"].append(Order("GIFT_BASKET", best_bids["GIFT_BASKET"], -limit_mult))
+            orders["GIFT_BASKET"].append(Order("GIFT_BASKET", best_bids["GIFT_BASKET"], limit_mult))
+
+        # Supposed to be higher
+        # strawberries_estimated_price = (prices["GIFT_BASKET"] - 4.0 * prices["CHOCOLATE"] - prices["ROSES"]) / 6.0
+
+        # self.strawberries_returns.append(prices["STRAWBERRIES"])
+        # self.strawberries_estimated_returns.append(strawberries_estimated_price)
+
+        # if len(self.strawberries_returns) < 2 or len(self.strawberries_estimated_returns) < 2:
+        #     return orders
+
+        # strawberries_rolling_mean = statistics.fmean(self.strawberries_returns[-10:])
+        # strawberries_rolling_std = statistics.stdev(self.strawberries_returns[-10:])
+
+        # strawberries_estimated_rolling_mean = statistics.fmean(self.strawberries_estimated_returns[-10:])
+        # strawberries_estimated_rolling_std = statistics.stdev(self.strawberries_estimated_returns[-10:])
+
+        # if strawberries_rolling_std != 0:
+        #     strawberries_z_score = (self.strawberries_returns[-1] - strawberries_rolling_mean) / strawberries_rolling_std
+        # else:
+        #     strawberries_z_score = 0
+        # if strawberries_estimated_rolling_std != 0:
+        #     strawberries_estimated_z_score = (self.strawberries_estimated_returns[-1] - strawberries_estimated_rolling_mean) / strawberries_estimated_rolling_std
+        # else:
+        #     strawberries_estimated_z_score = 0
+
+        # strawberries_z_score_diff = strawberries_z_score - strawberries_estimated_z_score
+
+        # # STRAWBERRIES undervalued
+        # if strawberries_z_score_diff < -1:
+        #     etf_best_bid_vol = buy_orders["GIFT_BASKET"][best_bids["GIFT_BASKET"]]
+        #     strawberries_best_ask_vol = sell_orders["STRAWBERRIES"][best_asks["STRAWBERRIES"]]
+        #     chocolate_best_ask_vol = sell_orders["CHOCOLATE"][best_asks["CHOCOLATE"]]
+        #     roses_best_ask_vol = sell_orders["ROSES"][best_asks["ROSES"]]
+
+        #     limit_mult = min(round(etf_best_bid_vol / 6.0), -strawberries_best_ask_vol, round(4.0 * -chocolate_best_ask_vol / 6.0), round(-roses_best_ask_vol / 6.0))
+        #     # if limit_mult == 0:
+        #     #     limit_mult = -strawberries_best_ask_vol
+        #     limit_mult = round(limit_mult * abs(strawberries_z_score_diff))
+
+        #     limit_mult = min(limit_mult, self.POSITION_LIMITS["STRAWBERRIES"] - positions["STRAWBERRIES"], self.POSITION_LIMITS["STRAWBERRIES"])
+
+        #     print("STRAWBERRIES positions:", positions["STRAWBERRIES"])
+        #     print("BUY", "STRAWBERRIES", str(limit_mult) + "x", best_asks["STRAWBERRIES"])
+        #     orders["STRAWBERRIES"].append(Order("STRAWBERRIES", best_asks["STRAWBERRIES"], limit_mult))
+        # # STRAWBERRIES overvalued
+        # elif strawberries_z_score_diff > 1:
+        #     etf_best_ask_vol = sell_orders["GIFT_BASKET"][best_asks["GIFT_BASKET"]]
+        #     strawberries_best_bid_vol = buy_orders["STRAWBERRIES"][best_bids["STRAWBERRIES"]]
+        #     chocolate_best_bid_vol = buy_orders["CHOCOLATE"][best_bids["CHOCOLATE"]]
+        #     roses_best_bid_vol = buy_orders["ROSES"][best_bids["ROSES"]]
+
+        #     limit_mult = min(round(-etf_best_ask_vol / 6.0), strawberries_best_bid_vol, round(4.0 * chocolate_best_bid_vol / 6.0), round(roses_best_bid_vol / 6.0))
+        #     # if limit_mult == 0:
+        #     #     limit_mult = strawberries_best_bid_vol
+        #     limit_mult = round(-limit_mult * abs(strawberries_z_score_diff))
+
+        #     limit_mult = max(limit_mult, -self.POSITION_LIMITS["STRAWBERRIES"] - positions["STRAWBERRIES"], -self.POSITION_LIMITS["STRAWBERRIES"])
+
+        #     print("STRAWBERRIES positions:", positions["STRAWBERRIES"])
+        #     print("SELL", "STRAWBERRIES", str(limit_mult) + "x", best_bids["STRAWBERRIES"])
+        #     orders["STRAWBERRIES"].append(Order("STRAWBERRIES", best_bids["STRAWBERRIES"], limit_mult))
+
+        # Supposed to be higher
+        # chocolate_estimated_price = (prices["GIFT_BASKET"] - 6.0 * prices["STRAWBERRIES"] - prices["ROSES"]) / 4.0
+
+        # self.chocolate_returns.append(prices["CHOCOLATE"])
+        # self.chocolate_estimated_returns.append(chocolate_estimated_price)
+
+        # if len(self.chocolate_returns) < 2 or len(self.chocolate_estimated_returns) < 2:
+        #     return orders
+
+        # chocolate_rolling_mean = statistics.fmean(self.chocolate_returns[-10:])
+        # chocolate_rolling_std = statistics.stdev(self.chocolate_returns[-10:])
+
+        # chocolate_estimated_rolling_mean = statistics.fmean(self.chocolate_estimated_returns[-10:])
+        # chocolate_estimated_rolling_std = statistics.stdev(self.chocolate_estimated_returns[-10:])
+
+        # if chocolate_rolling_std != 0:
+        #     chocolate_z_score = (self.chocolate_returns[-1] - chocolate_rolling_mean) / chocolate_rolling_std
+        # else:
+        #     chocolate_z_score = 0
+        # if chocolate_estimated_rolling_std != 0:
+        #     chocolate_estimated_z_score = (self.chocolate_estimated_returns[-1] - chocolate_estimated_rolling_mean) / chocolate_estimated_rolling_std
+        # else:
+        #     chocolate_estimated_z_score = 0
+
+        # chocolate_z_score_diff = chocolate_z_score - chocolate_estimated_z_score
+
+        # # CHOCOLATE undervalued
+        # if chocolate_z_score_diff < -1:
+        #     etf_best_bid_vol = buy_orders["GIFT_BASKET"][best_bids["GIFT_BASKET"]]
+        #     strawberries_best_ask_vol = sell_orders["STRAWBERRIES"][best_asks["STRAWBERRIES"]]
+        #     chocolate_best_ask_vol = sell_orders["CHOCOLATE"][best_asks["CHOCOLATE"]]
+        #     roses_best_ask_vol = sell_orders["ROSES"][best_asks["ROSES"]]
+
+        #     limit_mult = min(round(etf_best_bid_vol / 4.0), round(6.0 * -strawberries_best_ask_vol / 4.0), -chocolate_best_ask_vol, round(-roses_best_ask_vol / 4.0))
+        #     if limit_mult == 0:
+        #         limit_mult = -chocolate_best_ask_vol
+
+        #     print("BUY", "CHOCOLATE", str(limit_mult) + "x", best_asks["CHOCOLATE"])
+        #     orders["CHOCOLATE"].append(Order("CHOCOLATE", best_asks["CHOCOLATE"], limit_mult))
+        # # CHOCOLATE overvalued
+        # elif chocolate_z_score_diff > 1:
+        #     etf_best_ask_vol = sell_orders["GIFT_BASKET"][best_asks["GIFT_BASKET"]]
+        #     strawberries_best_bid_vol = buy_orders["STRAWBERRIES"][best_bids["STRAWBERRIES"]]
+        #     chocolate_best_bid_vol = buy_orders["CHOCOLATE"][best_bids["CHOCOLATE"]]
+        #     roses_best_bid_vol = buy_orders["ROSES"][best_bids["ROSES"]]
+
+        #     limit_mult = min(round(-etf_best_ask_vol / 4.0), round(6.0 * strawberries_best_bid_vol / 4.0), chocolate_best_bid_vol, round(roses_best_bid_vol / 4.0))
+        #     if limit_mult == 0:
+        #         limit_mult = chocolate_best_bid_vol
+
+        #     limit_mult = min(limit_mult, self.POSITION_LIMITS["STRAWBERRIES"] - positions["STRAWBERRIES"], self.POSITION_LIMITS["STRAWBERRIES"])
+
+        #     print("SELL", "CHOCOLATE", str(limit_mult) + "x", best_bids["CHOCOLATE"])
+        #     orders["CHOCOLATE"].append(Order("CHOCOLATE", best_bids["CHOCOLATE"], limit_mult))
+
+        # # Supposed to be higher
+        # roses_estimated_price = prices["GIFT_BASKET"] - 4.0 * prices["CHOCOLATE"] - 6.0 * prices["STRAWBERRIES"]
+
+        # self.roses_returns.append(prices["ROSES"])
+        # self.roses_estimated_returns.append(roses_estimated_price)
+
+        # if len(self.roses_returns) < 2 or len(self.roses_estimated_returns) < 2:
+        #     return orders
+
+        # roses_rolling_mean = statistics.fmean(self.roses_returns[-10:])
+        # roses_rolling_std = statistics.stdev(self.roses_returns[-10:])
+
+        # roses_estimated_rolling_mean = statistics.fmean(self.roses_estimated_returns[-10:])
+        # roses_estimated_rolling_std = statistics.stdev(self.roses_estimated_returns[-10:])
+
+        # if roses_rolling_std != 0:
+        #     roses_z_score = (self.roses_returns[-1] - roses_rolling_mean) / roses_rolling_std
+        # else:
+        #     roses_z_score = 0
+        # if roses_estimated_rolling_std != 0:
+        #     roses_estimated_z_score = (self.roses_estimated_returns[-1] - roses_estimated_rolling_mean) / roses_estimated_rolling_std
+        # else:
+        #     roses_estimated_z_score = 0
+
+        # roses_z_score_diff = roses_z_score - roses_estimated_z_score
+
+        # # ROSES undervalued
+        # if roses_z_score_diff < -2.5:
+        #     etf_best_bid_vol = buy_orders["GIFT_BASKET"][best_bids["GIFT_BASKET"]]
+        #     strawberries_best_ask_vol = sell_orders["STRAWBERRIES"][best_asks["STRAWBERRIES"]]
+        #     chocolate_best_ask_vol = sell_orders["CHOCOLATE"][best_asks["CHOCOLATE"]]
+        #     roses_best_ask_vol = sell_orders["ROSES"][best_asks["ROSES"]]
+
+        #     limit_mult = min(etf_best_bid_vol, round(6.0 * -strawberries_best_ask_vol), round(4.0 * -chocolate_best_ask_vol), -roses_best_ask_vol)
+        #     if limit_mult == 0:
+        #         limit_mult = roses_best_ask_vol
+
+        #     print("BUY", "ROSES", str(limit_mult) + "x", best_asks["ROSES"])
+        #     orders["ROSES"].append(Order("ROSES", best_asks["ROSES"], limit_mult))
+        # # ROSES overvalued
+        # elif roses_z_score_diff > 2.5:
+        #     etf_best_ask_vol = sell_orders["GIFT_BASKET"][best_asks["GIFT_BASKET"]]
+        #     strawberries_best_bid_vol = buy_orders["STRAWBERRIES"][best_bids["STRAWBERRIES"]]
+        #     chocolate_best_bid_vol = buy_orders["CHOCOLATE"][best_bids["CHOCOLATE"]]
+        #     roses_best_bid_vol = buy_orders["ROSES"][best_bids["ROSES"]]
+
+        #     limit_mult = min(-etf_best_ask_vol, round(6.0 * strawberries_best_bid_vol), round(4.0 * chocolate_best_bid_vol), roses_best_bid_vol)
+        #     if limit_mult == 0:
+        #         limit_mult = roses_best_bid_vol
+
+        #     print("SELL", "ROSES", str(limit_mult) + "x", best_bids["ROSES"])
+        #     orders["ROSES"].append(Order("ROSES", best_bids["ROSES"], limit_mult))
 
         return orders
 
     def marshalTraderData(self) -> str: 
-        return json.dumps({"starfruit_cache": self.starfruit_cache, "starfruit_spread_cache": self.starfruit_spread_cache, "orchid_cache": self.orchid_cache, "orchid_spread_cache": [], "sunlight_cache": self.sunlight_cache, "humidity_cache": self.humidity_cache, "etf_returns": self.etf_returns, "assets_returns": self.assets_returns})
+        return json.dumps({"starfruit_cache": self.starfruit_cache, "starfruit_spread_cache": self.starfruit_spread_cache, "orchid_cache": self.orchid_cache, "orchid_spread_cache": [], "sunlight_cache": self.sunlight_cache, "humidity_cache": self.humidity_cache, "etf_returns": self.etf_returns, "assets_returns": self.assets_returns, "strawberries_returns": self.strawberries_returns, "strawberries_estimated_returns": self.strawberries_estimated_returns, "chocolate_returns": self.chocolate_returns, "chocolate_estimated_returns": self.chocolate_estimated_returns, "roses_returns": self.roses_returns, "roses_estimated_returns": self.roses_estimated_returns})
 
     def unmarshalTraderData(self, state: TradingState): 
         if not state.traderData:
-            state.traderData = json.dumps({"starfruit_cache": [], "starfruit_spread_cache": [], "orchid_cache": [], "orchid_spread_cache": [], "sunlight_cache": [], "humidity_cache": [], "etf_returns": [], "assets_returns": []})
+            state.traderData = json.dumps({"starfruit_cache": [], "starfruit_spread_cache": [], "orchid_cache": [], "orchid_spread_cache": [], "sunlight_cache": [], "humidity_cache": [], "etf_returns": [], "assets_returns": [], "strawberries_returns": [], "strawberries_estimated_returns": [], "chocolate_returns": [], "chocolate_estimated_returns": [], "roses_returns": [], "roses_estimated_returns": []})
         
         traderDataDict = json.loads(state.traderData)
         self.starfruit_cache = traderDataDict["starfruit_cache"]
@@ -235,6 +448,12 @@ class Trader:
 
         self.etf_returns = traderDataDict["etf_returns"]
         self.assets_returns = traderDataDict["assets_returns"]
+        self.chocolate_returns = traderDataDict["chocolate_returns"]
+        self.chocolate_estimated_returns = traderDataDict["chocolate_estimated_returns"]
+        self.strawberries_returns = traderDataDict["strawberries_returns"]
+        self.strawberries_estimated_returns = traderDataDict["strawberries_estimated_returns"]
+        self.roses_returns = traderDataDict["roses_returns"]
+        self.roses_estimated_returns = traderDataDict["roses_estimated_returns"]
 
     def run(self, state: TradingState):
         # Update positions
@@ -475,21 +694,21 @@ class Trader:
                 
                 if traded_quantity > 0:
                     cost_basis /= traded_quantity
-                print("COST_BASIS", cost_basis)
+                # print("COST_BASIS", cost_basis)
 
                 cur_position = self.positions[product]
-                print("POSITION", product, cur_position)
+                # print("POSITION", product, cur_position)
 
-                print("CONVERSION_BID", conversion_observations.bidPrice - conversion_observations.exportTariff)
-                print("CONVERSION_ASK", conversion_observations.askPrice + conversion_observations.importTariff)
-                print("TRANSPORT_FEES", conversion_observations.transportFees)
+                # print("CONVERSION_BID", conversion_observations.bidPrice - conversion_observations.exportTariff)
+                # print("CONVERSION_ASK", conversion_observations.askPrice + conversion_observations.importTariff)
+                # print("TRANSPORT_FEES", conversion_observations.transportFees)
                 # Construct conversions
                 if cur_position != 0:
                     # Export conversions
                     if cur_position > 0:
                         conversion_bid = conversion_observations.bidPrice - conversion_observations.exportTariff
                         if conversion_bid - (conversion_observations.transportFees / cur_position) >= cost_basis:
-                            print("EXPORT", product, str(cur_position) + "x", conversion_bid)
+                            # print("EXPORT", product, str(cur_position) + "x", conversion_bid)
                             conversions = cur_position
                             cur_position = 0 # All current positions converted
 
@@ -497,19 +716,19 @@ class Trader:
                     else:
                         conversion_ask = conversion_observations.askPrice + conversion_observations.importTariff
                         if conversion_ask + (conversion_observations.transportFees / cur_position) <= -cost_basis:
-                            print("IMPORT", product, str(cur_position) + "x", conversion_ask)
+                            # print("IMPORT", product, str(cur_position) + "x", conversion_ask)
                             conversions = -cur_position
                             cur_position = 0 # All current positions converted
 
                 # Construct buy orders
                 for ask, vol in order_depth.sell_orders.items():
-                    print("ASK", ask, "VOL", vol)
+                    # print("ASK", ask, "VOL", vol)
                     # if ((ask <= lower_bound) or ((self.positions[product] < 0) and (ask <= lower_bound + (spread // 2)))) and cur_position < self.POSITION_LIMITS[product]:
                     # if ((ask <= lower_bound) or ((self.positions[product] < 0) and (ask == lower_bound + 1))) and cur_position < self.POSITION_LIMITS[product]:
                     if (ask < cost_basis) and (cur_position < self.POSITION_LIMITS[product]):
                         order_vol = min(-vol, self.POSITION_LIMITS[product] - cur_position)
                         cur_position += order_vol
-                        print("BUY", product, str(order_vol) + "x", ask)
+                        # print("BUY", product, str(order_vol) + "x", ask)
                         orders.append(Order(product, ask, order_vol))
 
                 undercut_market_ask = best_market_ask - 1
@@ -530,19 +749,19 @@ class Trader:
 
                 # Construct sell orders
                 for bid, vol in order_depth.buy_orders.items():
-                    print("BID", ask, "VOL", vol)
+                    # print("BID", ask, "VOL", vol)
                     if ((bid >= upper_bound) or ((self.positions[product] > 0) and (bid >= upper_bound - (spread // 2)))) and cur_position > -self.POSITION_LIMITS[product]:
                     # if ((bid >= upper_bound) or ((self.positions[product] > 0) and (bid == upper_bound - 1))) and cur_position > -self.POSITION_LIMITS[product]:
                         order_vol = max(-vol, -self.POSITION_LIMITS[product] - cur_position)
                         cur_position += order_vol
-                        print("SELL", product, str(order_vol) + "x", bid)
+                        # print("SELL", product, str(order_vol) + "x", bid)
                         orders.append(Order(product, bid, order_vol))
 
                 if cur_position > -self.POSITION_LIMITS[product]:
                     order_vol = max(-self.POSITION_LIMITS[product], -self.POSITION_LIMITS[product] - cur_position)
                     # order_vol = max(int(0.05 * -self.POSITION_LIMITS[product]), -self.POSITION_LIMITS[product] - cur_position) # Buy at most 5% of POSITION_LIMITS
                     cur_position += order_vol
-                    print("SELL", product, str(order_vol) + "x", undercut_market_ask)
+                    # print("SELL", product, str(order_vol) + "x", undercut_market_ask)
                     orders.append(Order(product, undercut_market_ask, order_vol))
 
             result[product] = orders
