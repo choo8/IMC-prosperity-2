@@ -70,10 +70,10 @@ class Trader:
 
     N = statistics.NormalDist(mu=0, sigma=1)
 
-    def BS_CALL(S, K, T, r, sigma):
+    def BS_CALL(self, S, K, T, r, sigma):
         d1 = (np.log(S / K) + (r + sigma ** 2 / 2.) * T) / (sigma * np.sqrt(T))
         d2 = d1 - sigma * np.sqrt(T)
-        return S * N.cdf(d1) - K * np.exp(-r * T) * N.cdf(d2)
+        return S * self.N.cdf(d1) - K * np.exp(-r * T) * self.N.cdf(d2)
 
     def compute_vwap(self, order_depth):
         total_ask, total_bid = 0, 0
@@ -450,8 +450,7 @@ class Trader:
 
     def compute_coconut_coupon_orders(self, state: TradingState):
         products = ["COCONUT_COUPON", "COCONUT"]
-        positions, buy_orders, sell_orders, best_bids, best_asks, prices, orders = {}, {}, {}, {}, {}, {}, {
-            "COCONUT_COUPON": [], "COCONUT": []}
+        positions, buy_orders, sell_orders, best_bids, best_asks, prices, orders = {}, {}, {}, {}, {}, {}, {"COCONUT_COUPON": [], "COCONUT": []}
 
         for product in products:
             positions[product] = state.position[product] if product in state.position else 0
@@ -479,6 +478,9 @@ class Trader:
         self.coconut_returns.append(prices["COCONUT"])
         self.coconut_estimated_returns.append(prices["COCONUT"])
 
+        if len(self.coconut_coupon_returns) < 2 or len(self.coconut_coupon_bsm_returns) < 2:
+            return orders
+
         coconut_coupon_rolling_mean = statistics.fmean(self.coconut_coupon_returns[-5:])
         coconut_coupon_rolling_std = statistics.stdev(self.coconut_coupon_returns[-5:])
 
@@ -486,14 +488,12 @@ class Trader:
         coconut_coupon_bsm_rolling_std = statistics.stdev(self.coconut_coupon_bsm_returns[-5:])
 
         if coconut_coupon_rolling_std != 0:
-            coconut_coupon_z_score = (self.coconut_coupon_returns[-1] - coconut_coupon_rolling_mean) \
-                                     / coconut_coupon_rolling_std
+            coconut_coupon_z_score = (self.coconut_coupon_returns[-1] - coconut_coupon_rolling_mean) / coconut_coupon_rolling_std
         else:
             coconut_coupon_z_score = 0
 
         if coconut_coupon_bsm_rolling_std != 0:
-            coconut_coupon_bsm_z_score = (self.coconut_coupon_bsm_returns[-1] - coconut_coupon_bsm_rolling_mean) \
-                                     / coconut_coupon_bsm_rolling_std
+            coconut_coupon_bsm_z_score = (self.coconut_coupon_bsm_returns[-1] - coconut_coupon_bsm_rolling_mean) / coconut_coupon_bsm_rolling_std
         else:
             coconut_coupon_bsm_z_score = 0
 
@@ -501,11 +501,8 @@ class Trader:
 
         coconut_coupon_z_score_diff = coconut_coupon_z_score - coconut_coupon_bsm_z_score
 
-        if len(self.coconut_coupon_returns) < 2 or len(self.coconut_coupon_bsm_returns) < 2:
-            return orders
-
         # Option is underpriced
-        if coconut_coupon_z_score_diff < -0.5:
+        if coconut_coupon_z_score_diff < -2:
             coconut_coupon_best_ask_vol = sell_orders["COCONUT_COUPON"][best_asks["COCONUT_COUPON"]]
 
             limit_mult = -coconut_coupon_best_ask_vol
@@ -520,7 +517,7 @@ class Trader:
             orders["COCONUT_COUPON"].append(Order("COCONUT_COUPON", best_asks["COCONUT_COUPON"], limit_mult))
 
         # Option is overpriced
-        elif coconut_coupon_z_score_diff > 0.5:
+        elif coconut_coupon_z_score_diff > 2:
             coconut_coupon_best_bid_vol = buy_orders["COCONUT_COUPON"][best_bids["COCONUT_COUPON"]]
 
             limit_mult = coconut_coupon_best_bid_vol
@@ -561,6 +558,11 @@ class Trader:
         self.roses_returns = traderDataDict["roses_returns"]
         self.roses_estimated_returns = traderDataDict["roses_estimated_returns"]
 
+        self.coconut_returns = traderDataDict["coconut_returns"]
+        self.coconut_estimated_returns = traderDataDict["coconut_estimated_returns"]
+        self.coconut_coupon_returns = traderDataDict["coconut_coupon_returns"]
+        self.coconut_coupon_bsm_returns = traderDataDict["coconut_coupon_bsm_returns"]
+
     def run(self, state: TradingState):
         # Update positions
         for product, position in state.position.items():
@@ -577,7 +579,7 @@ class Trader:
 
             best_market_ask = min(order_depth.sell_orders.keys())
             best_market_bid = max(order_depth.buy_orders.keys())
-            
+
             # market_price = (best_market_ask + best_market_bid) / 2
             market_price = self.compute_vwap(order_depth)
 
@@ -625,7 +627,7 @@ class Trader:
                     orders.append(Order(product, ask, order_vol))
 
                 cur_position = self.positions[product]
-        
+
                 # Market make
                 for bid, vol in order_depth.buy_orders.items():
                     if ((bid > acceptable_price) or ((self.positions[product] > 0) and (bid == acceptable_price))) and cur_position > -self.POSITION_LIMITS[product]:
@@ -633,7 +635,7 @@ class Trader:
                         cur_position += order_vol
                         # print("SELL", product, str(order_vol) + "x", bid)
                         orders.append(Order(product, bid, order_vol))
-                
+
                 # Market take
                 if cur_position > -self.POSITION_LIMITS[product]:
                     if self.positions[product] < 0:
@@ -727,7 +729,7 @@ class Trader:
             # storage costs per timestamp: 0.1 seashell
 
             # each day (1000000 timesteps) = 12 hours
-            
+
             # orchid quality does not deterioriate overnight
             elif product == "ORCHIDS":
                 if len(self.orchid_cache) == 4:
@@ -749,7 +751,7 @@ class Trader:
 
                 if len(self.humidity_cache) == 4:
                     self.humidity_cache.pop(0)
-                
+
                 self.humidity_cache.append(conversion_observations.humidity)
 
                 if len(self.orchid_cache) == 4:
@@ -778,7 +780,7 @@ class Trader:
                 #             new_quantity += trade.quantity
 
                 #     self.orchid_last_trade = own_trades[0].timestamp
-                    
+
                 #     old_quantity = new_quantity - self.positions[product]
                 #     new_cost_basis += abs(self.orchid_cost_basis) * old_quantity
                 #     new_cost_basis /= self.positions[product]
@@ -797,7 +799,7 @@ class Trader:
                     else:
                         cost_basis -= trade.price * trade.quantity
                         traded_quantity += trade.quantity
-                
+
                 if traded_quantity > 0:
                     cost_basis /= traded_quantity
                 # print("COST_BASIS", cost_basis)
@@ -871,7 +873,7 @@ class Trader:
                     orders.append(Order(product, undercut_market_ask, order_vol))
 
             result[product] = orders
-    
+
         # 6 strawberry, 4 choc and 1 rose in 1 basket
         # treasure chest 7500 seashells each
         # basket_orders = self.compute_basket_orders(state.order_depths)
@@ -880,8 +882,13 @@ class Trader:
         for product, orders in basket_orders.items():
             result[product] = orders
 
+        coconut_coupon_orders = self.compute_coconut_coupon_orders(state)
+
+        for product, orders in coconut_coupon_orders.items():
+            result[product] = orders
+
         traderData = self.marshalTraderData()
-        
+
         return result, conversions, traderData
 
 
