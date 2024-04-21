@@ -469,7 +469,7 @@ class Trader:
         T = 250
         r = 0
         sigma = 0.01011932923
-        bsm_price = BS_CALL(S, K, T, r, sigma)
+        bsm_price = self.BS_CALL(S, K, T, r, sigma)
 
         self.coconut_coupon_returns.append(prices["COCONUT_COUPON"])
         self.coconut_coupon_bsm_returns.append(bsm_price)
