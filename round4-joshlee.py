@@ -481,11 +481,11 @@ class Trader:
         if len(self.coconut_coupon_returns) < 2 or len(self.coconut_coupon_bsm_returns) < 2:
             return orders
 
-        coconut_coupon_rolling_mean = statistics.fmean(self.coconut_coupon_returns[-5:])
-        coconut_coupon_rolling_std = statistics.stdev(self.coconut_coupon_returns[-5:])
+        coconut_coupon_rolling_mean = statistics.fmean(self.coconut_coupon_returns[-200:])
+        coconut_coupon_rolling_std = statistics.stdev(self.coconut_coupon_returns[-200:])
 
-        coconut_coupon_bsm_rolling_mean = statistics.fmean(self.coconut_coupon_bsm_returns[-5:])
-        coconut_coupon_bsm_rolling_std = statistics.stdev(self.coconut_coupon_bsm_returns[-5:])
+        coconut_coupon_bsm_rolling_mean = statistics.fmean(self.coconut_coupon_bsm_returns[-200:])
+        coconut_coupon_bsm_rolling_std = statistics.stdev(self.coconut_coupon_bsm_returns[-200:])
 
         if coconut_coupon_rolling_std != 0:
             coconut_coupon_z_score = (self.coconut_coupon_returns[-1] - coconut_coupon_rolling_mean) / coconut_coupon_rolling_std
@@ -502,7 +502,7 @@ class Trader:
         coconut_coupon_z_score_diff = coconut_coupon_z_score - coconut_coupon_bsm_z_score
 
         # Option is underpriced
-        if coconut_coupon_z_score_diff < -2:
+        if coconut_coupon_z_score_diff < -1.2:
             coconut_coupon_best_ask_vol = sell_orders["COCONUT_COUPON"][best_asks["COCONUT_COUPON"]]
 
             limit_mult = -coconut_coupon_best_ask_vol
@@ -517,7 +517,7 @@ class Trader:
             orders["COCONUT_COUPON"].append(Order("COCONUT_COUPON", best_asks["COCONUT_COUPON"], limit_mult))
 
         # Option is overpriced
-        elif coconut_coupon_z_score_diff > 2:
+        elif coconut_coupon_z_score_diff > 1.2:
             coconut_coupon_best_bid_vol = buy_orders["COCONUT_COUPON"][best_bids["COCONUT_COUPON"]]
 
             limit_mult = coconut_coupon_best_bid_vol
