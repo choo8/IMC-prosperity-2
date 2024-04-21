@@ -205,11 +205,11 @@ class Trader:
         if len(self.etf_returns) < 2 or len(self.assets_returns) < 2:
             return orders
 
-        etf_rolling_mean = statistics.fmean(self.etf_returns[-10:])
-        etf_rolling_std = statistics.stdev(self.etf_returns[-10:])
+        etf_rolling_mean = statistics.fmean(self.etf_returns[-200:])
+        etf_rolling_std = statistics.stdev(self.etf_returns[-200:])
 
-        assets_rolling_mean = statistics.fmean(self.assets_returns[-10:])
-        assets_rolling_std = statistics.stdev(self.assets_returns[-10:])
+        assets_rolling_mean = statistics.fmean(self.assets_returns[-200:])
+        assets_rolling_std = statistics.stdev(self.assets_returns[-200:])
 
         if etf_rolling_std != 0:
             etf_z_score = (self.etf_returns[-1] - etf_rolling_mean) / etf_rolling_std
