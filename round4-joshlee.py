@@ -66,6 +66,8 @@ class Trader:
 
     coconut_coupon_returns = []
     coconut_coupon_bsm_returns = []
+    coconut_returns = []
+    coconut_estimated_returns = []
 
     N = norm.cdf
 
@@ -474,6 +476,10 @@ class Trader:
         self.coconut_coupon_returns.append(prices["COCONUT_COUPON"])
         self.coconut_coupon_bsm_returns.append(bsm_price)
 
+        # Dummy for now
+        self.coconut_returns.append(prices["COCONUT"])
+        self.coconut_estimated_returns.append(prices["COCONUT"])
+
         coconut_coupon_rolling_mean = statistics.fmean(self.coconut_coupon_returns[-5:])
         coconut_coupon_rolling_std = statistics.stdev(self.coconut_coupon_returns[-5:])
 
@@ -503,8 +509,7 @@ class Trader:
         if coconut_coupon_z_score_diff < -2:
             coconut_coupon_best_ask_vol = sell_orders["COCONUT_COUPON"][best_asks["COCONUT_COUPON"]]
 
-            if limit_mult == 0:
-                limit_mult = -coconut_coupon_best_ask_vol
+            limit_mult = -coconut_coupon_best_ask_vol
 
             limit_mult = round(limit_mult * abs(coconut_coupon_z_score_diff) / 2)
 
@@ -519,8 +524,7 @@ class Trader:
         elif coconut_coupon_z_score_diff > 2:
             coconut_coupon_best_bid_vol = buy_orders["COCONUT_COUPON"][best_bids["COCONUT_COUPON"]]
 
-            if limit_mult == 0:
-                 limit_mult = coconut_coupon_best_bid_vol
+            limit_mult = coconut_coupon_best_bid_vol
 
             limit_mult = round(-limit_mult * abs(coconut_coupon_z_score_diff) / 2)
 
@@ -529,16 +533,16 @@ class Trader:
 
             print("COCONUT_COUPON positions:", positions["COCONUT_COUPON"])
             print("SELL", "COCONUT_COUPON", str(limit_mult) + "x", best_bids["COCONUT_COUPON"])
-        orders["COCONUT_COUPON"].append(Order("COCONUT_COUPON", best_bids["COCONUT_COUPON"], limit_mult))
+            orders["COCONUT_COUPON"].append(Order("COCONUT_COUPON", best_bids["COCONUT_COUPON"], limit_mult))
 
         return orders
 
     def marshalTraderData(self) -> str: 
-        return json.dumps({"starfruit_cache": self.starfruit_cache, "starfruit_spread_cache": self.starfruit_spread_cache, "orchid_cache": self.orchid_cache, "orchid_spread_cache": [], "sunlight_cache": self.sunlight_cache, "humidity_cache": self.humidity_cache, "etf_returns": self.etf_returns, "assets_returns": self.assets_returns, "strawberries_returns": self.strawberries_returns, "strawberries_estimated_returns": self.strawberries_estimated_returns, "chocolate_returns": self.chocolate_returns, "chocolate_estimated_returns": self.chocolate_estimated_returns, "roses_returns": self.roses_returns, "roses_estimated_returns": self.roses_estimated_returns, "coconut_coupon_returns": self.coconut_coupon_returns, "coconut_coupon_bsm_returns": self.coconut_coupon_bsm_returns})
+        return json.dumps({"starfruit_cache": self.starfruit_cache, "starfruit_spread_cache": self.starfruit_spread_cache, "orchid_cache": self.orchid_cache, "orchid_spread_cache": [], "sunlight_cache": self.sunlight_cache, "humidity_cache": self.humidity_cache, "etf_returns": self.etf_returns, "assets_returns": self.assets_returns, "strawberries_returns": self.strawberries_returns, "strawberries_estimated_returns": self.strawberries_estimated_returns, "chocolate_returns": self.chocolate_returns, "chocolate_estimated_returns": self.chocolate_estimated_returns, "roses_returns": self.roses_returns, "roses_estimated_returns": self.roses_estimated_returns, "coconut_coupon_returns": self.coconut_coupon_returns, "coconut_coupon_bsm_returns": self.coconut_coupon_bsm_returns, "coconut_returns": self.coconut_returns, "coconut_estimated_returns": self.coconut_estimated_returns})
 
     def unmarshalTraderData(self, state: TradingState): 
         if not state.traderData:
-            state.traderData = json.dumps({"starfruit_cache": [], "starfruit_spread_cache": [], "orchid_cache": [], "orchid_spread_cache": [], "sunlight_cache": [], "humidity_cache": [], "etf_returns": [], "assets_returns": [], "strawberries_returns": [], "strawberries_estimated_returns": [], "chocolate_returns": [], "chocolate_estimated_returns": [], "roses_returns": [], "roses_estimated_returns": [], "coconut_coupon_returns": [], "coconut_coupon_bsm_returns": []})
+            state.traderData = json.dumps({"starfruit_cache": [], "starfruit_spread_cache": [], "orchid_cache": [], "orchid_spread_cache": [], "sunlight_cache": [], "humidity_cache": [], "etf_returns": [], "assets_returns": [], "strawberries_returns": [], "strawberries_estimated_returns": [], "chocolate_returns": [], "chocolate_estimated_returns": [], "roses_returns": [], "roses_estimated_returns": [], "coconut_coupon_returns": [], "coconut_coupon_bsm_returns": [], "coconut_returns": [], "coconut_estimated_returns": []})
         
         traderDataDict = json.loads(state.traderData)
         self.starfruit_cache = traderDataDict["starfruit_cache"]
