@@ -5,7 +5,6 @@ import json
 import statistics
 
 import numpy as np
-from scipy.stats import norm
 
 class Trader:
     POSITION_LIMITS = {
@@ -69,12 +68,12 @@ class Trader:
     coconut_returns = []
     coconut_estimated_returns = []
 
-    N = norm.cdf
+    N = statistics.NormalDist(mu=0, sigma=1)
 
     def BS_CALL(S, K, T, r, sigma):
-        d1 = (np.log(S / K) + (r + sigma ** 2 / 2) * T) / (sigma * np.sqrt(T))
+        d1 = (np.log(S / K) + (r + sigma ** 2 / 2.) * T) / (sigma * np.sqrt(T))
         d2 = d1 - sigma * np.sqrt(T)
-        return S * N(d1) - K * np.exp(-r * T) * N(d2)
+        return S * N.cdf(d1) - K * np.exp(-r * T) * N.cdf(d2)
 
     def compute_vwap(self, order_depth):
         total_ask, total_bid = 0, 0
@@ -506,7 +505,7 @@ class Trader:
             return orders
 
         # Option is underpriced
-        if coconut_coupon_z_score_diff < -2:
+        if coconut_coupon_z_score_diff < -0.5:
             coconut_coupon_best_ask_vol = sell_orders["COCONUT_COUPON"][best_asks["COCONUT_COUPON"]]
 
             limit_mult = -coconut_coupon_best_ask_vol
@@ -521,7 +520,7 @@ class Trader:
             orders["COCONUT_COUPON"].append(Order("COCONUT_COUPON", best_asks["COCONUT_COUPON"], limit_mult))
 
         # Option is overpriced
-        elif coconut_coupon_z_score_diff > 2:
+        elif coconut_coupon_z_score_diff > 0.5:
             coconut_coupon_best_bid_vol = buy_orders["COCONUT_COUPON"][best_bids["COCONUT_COUPON"]]
 
             limit_mult = coconut_coupon_best_bid_vol
@@ -888,15 +887,15 @@ class Trader:
 
 if __name__ == '__main__':
     """
-    N = norm.cdf
+    N = statistics.NormalDist(mu=0, sigma=1)
 
     def BS_CALL(S, K, T, r, sigma):
         d1 = (np.log(S / K) + (r + sigma ** 2 / 2.) * T) / (sigma * np.sqrt(T))
         d2 = d1 - sigma * np.sqrt(T)
-        return S * N(d1) - K * np.exp(-r * T) * N(d2)
+        return S * N.cdf(d1) - K * np.exp(-r * T) * N.cdf(d2)
 
     # Use BSM
-    S = 9819
+    S = 10000
     K = 10000
     T = 250
     r = 0
