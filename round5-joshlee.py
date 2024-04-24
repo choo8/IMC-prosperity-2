@@ -485,11 +485,6 @@ class Trader:
         # Fast moving average
         assets_rolling_mean_fast = statistics.fmean(self.assets_returns[-100:])
 
-        print(self.etf_returns[-1])
-
-        print(assets_rolling_mean_fast)
-        print(assets_rolling_mean)
-
         # Empirically tuned to avoid noisy buy and sell signals - do nothing if sideways market
         if assets_rolling_mean_fast > assets_rolling_mean + 4:
 
@@ -624,14 +619,16 @@ class Trader:
 
             # Buy signal
             if self.rhianna_buy:
-                vol = min(-ask_vol, self.POSITION_LIMITS["ROSES"] - max(0, roses_pos))
-                print("BUY", "ROSES", str(vol) + "x", best_ask)
-                orders.append(Order("ROSES", best_ask, vol))
-            # Sell signal
-            elif self.rhianna_trade_before:
                 vol = max(-bid_vol, -self.POSITION_LIMITS["ROSES"] - min(0, roses_pos))
                 print("SELL", "ROSES", str(vol) + "x", best_bid)
                 orders.append(Order("ROSES", best_bid, vol))
+                self.rhianna_buy = False
+            # Sell signal
+            elif self.rhianna_trade_before:
+                vol = min(-ask_vol, self.POSITION_LIMITS["ROSES"] - max(0, roses_pos))
+                print("BUY", "ROSES", str(vol) + "x", best_bid)
+                orders.append(Order("ROSES", best_ask, vol))
+                self.rhianna_buy = True
 
         return orders
 
@@ -794,7 +791,7 @@ class Trader:
                     # if ((ask <= lower_bound) or ((self.positions[product] < 0) and (ask == lower_bound + 1))) and cur_position < self.POSITION_LIMITS[product]:
                         order_vol = min(-vol, self.POSITION_LIMITS[product] - cur_position)
                         cur_position += order_vol
-                        # print("BUY", product, str(order_vol) + "x", ask)
+                        print("BUY", product, str(order_vol) + "x", ask)
                         orders.append(Order(product, ask, order_vol))
 
                 undercut_market_ask = best_market_ask - 1
@@ -808,7 +805,7 @@ class Trader:
                 if cur_position < self.POSITION_LIMITS[product]:
                     order_vol = self.POSITION_LIMITS[product] - cur_position
                     cur_position += order_vol
-                    # print("BUY", product, str(order_vol) + "x", own_bid)
+                    print("BUY", product, str(order_vol) + "x", own_bid)
                     orders.append(Order(product, own_bid, order_vol))
 
                 cur_position = self.positions[product]
@@ -819,23 +816,24 @@ class Trader:
                     # if ((bid >= upper_bound) or ((self.positions[product] > 0) and (bid == upper_bound - 1))) and cur_position > -self.POSITION_LIMITS[product]:
                         order_vol = max(-vol, -self.POSITION_LIMITS[product] - cur_position)
                         cur_position += order_vol
-                        # print("SELL", product, str(order_vol) + "x", bid)
+                        print("SELL", product, str(order_vol) + "x", bid)
                         orders.append(Order(product, bid, order_vol))
 
                 if cur_position > -self.POSITION_LIMITS[product]:
                     order_vol = max(-self.POSITION_LIMITS[product], -self.POSITION_LIMITS[product] - cur_position)
                     cur_position += order_vol
-                    # print("SELL", product, str(order_vol) + "x", own_ask)
+                    print("SELL", product, str(order_vol) + "x", own_ask)
                     orders.append(Order(product, own_ask, order_vol))
 
             # sunlight less than 7 hour, production decrease 4% for every 10 min
             # humidity ideal 60 - 80, outside fall 2% for every 5% humidity change
-            # import / export tarrif
+            # import / export tariff
             # storage costs per timestamp: 0.1 seashell
 
             # each day (1000000 timesteps) = 12 hours
 
-            # orchid quality does not deterioriate overnight
+            """
+            # orchid quality does not deteriorate overnight
             elif product == "ORCHIDS":
                 if len(self.orchid_cache) == 4:
                     self.orchid_cache.pop(0)
@@ -976,6 +974,7 @@ class Trader:
                     cur_position += order_vol
                     # print("SELL", product, str(order_vol) + "x", undercut_market_ask)
                     orders.append(Order(product, undercut_market_ask, order_vol))
+            """
 
             result[product] = orders
 
