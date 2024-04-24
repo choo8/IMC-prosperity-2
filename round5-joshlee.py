@@ -624,16 +624,14 @@ class Trader:
 
             # Buy signal
             if self.rhianna_buy:
+                vol = min(-ask_vol, self.POSITION_LIMITS["ROSES"] - max(0, roses_pos))
+                print("BUY", "ROSES", str(vol) + "x", best_ask)
+                orders.append(Order("ROSES", best_ask, vol))
+            # Sell signal
+            elif self.rhianna_trade_before:
                 vol = max(-bid_vol, -self.POSITION_LIMITS["ROSES"] - min(0, roses_pos))
                 print("SELL", "ROSES", str(vol) + "x", best_bid)
                 orders.append(Order("ROSES", best_bid, vol))
-                self.rhianna_buy = False
-            # Sell signal
-            elif self.rhianna_trade_before:
-                vol = min(-ask_vol, self.POSITION_LIMITS["ROSES"] - max(0, roses_pos))
-                print("BUY", "ROSES", str(vol) + "x", best_bid)
-                orders.append(Order("ROSES", best_ask, vol))
-                self.rhianna_buy = True
 
         return orders
 
