@@ -68,6 +68,9 @@ class Trader:
     coconut_returns = []
     coconut_estimated_returns = []
 
+    rhianna_buy = False
+    rhianna_trade_before = False
+
     N = statistics.NormalDist(mu=0, sigma=1)
 
     def BS_CALL(self, S, K, T, r, sigma):
@@ -599,12 +602,47 @@ class Trader:
 
         return orders
 
+    def compute_roses_orders(self, state: TradingState):
+        orders = []
+
+        roses_pos = state.position["ROSES"] if "ROSES" in state.position else 0
+        best_bid = max(state.order_depths["ROSES"].buy_orders.keys())
+        bid_vol = state.order_depths["ROSES"].buy_orders[best_bid]
+        best_ask = min(state.order_depths["ROSES"].sell_orders.keys())
+        ask_vol = state.order_depths["ROSES"].sell_orders[best_ask]
+
+        if "ROSES" not in state.market_trades:
+            return orders
+
+        for trade in state.market_trades["ROSES"]:
+            if trade.buyer == "Rhianna":
+                self.rhianna_buy = True
+                self.rhianna_trade_before = True
+            elif trade.seller == "Rhianna":
+                self.rhianna_buy = False
+                self.rhianna_trade_before = True
+
+            # Buy signal
+            if self.rhianna_buy:
+                vol = max(-bid_vol, -self.POSITION_LIMITS["ROSES"] - min(0, roses_pos))
+                print("SELL", "ROSES", str(vol) + "x", best_bid)
+                orders.append(Order("ROSES", best_bid, vol))
+                self.rhianna_buy = False
+            # Sell signal
+            elif self.rhianna_trade_before:
+                vol = min(-ask_vol, self.POSITION_LIMITS["ROSES"] - max(0, roses_pos))
+                print("BUY", "ROSES", str(vol) + "x", best_bid)
+                orders.append(Order("ROSES", best_ask, vol))
+                self.rhianna_buy = True
+
+        return orders
+
     def marshalTraderData(self) -> str: 
-        return json.dumps({"starfruit_cache": self.starfruit_cache, "starfruit_spread_cache": self.starfruit_spread_cache, "orchid_cache": self.orchid_cache, "orchid_spread_cache": [], "sunlight_cache": self.sunlight_cache, "humidity_cache": self.humidity_cache, "etf_returns": self.etf_returns, "assets_returns": self.assets_returns, "strawberries_returns": self.strawberries_returns, "strawberries_estimated_returns": self.strawberries_estimated_returns, "chocolate_returns": self.chocolate_returns, "chocolate_estimated_returns": self.chocolate_estimated_returns, "roses_returns": self.roses_returns, "roses_estimated_returns": self.roses_estimated_returns, "coconut_coupon_returns": self.coconut_coupon_returns, "coconut_coupon_bsm_returns": self.coconut_coupon_bsm_returns, "coconut_returns": self.coconut_returns, "coconut_estimated_returns": self.coconut_estimated_returns})
+        return json.dumps({"starfruit_cache": self.starfruit_cache, "starfruit_spread_cache": self.starfruit_spread_cache, "orchid_cache": self.orchid_cache, "orchid_spread_cache": [], "sunlight_cache": self.sunlight_cache, "humidity_cache": self.humidity_cache, "etf_returns": self.etf_returns, "assets_returns": self.assets_returns, "strawberries_returns": self.strawberries_returns, "strawberries_estimated_returns": self.strawberries_estimated_returns, "chocolate_returns": self.chocolate_returns, "chocolate_estimated_returns": self.chocolate_estimated_returns, "roses_returns": self.roses_returns, "roses_estimated_returns": self.roses_estimated_returns, "coconut_coupon_returns": self.coconut_coupon_returns, "coconut_coupon_bsm_returns": self.coconut_coupon_bsm_returns, "coconut_returns": self.coconut_returns, "coconut_estimated_returns": self.coconut_estimated_returns, "rhianna_buy": self.rhianna_buy, "rhianna_trade_before": self.rhianna_trade_before})
 
     def unmarshalTraderData(self, state: TradingState): 
         if not state.traderData:
-            state.traderData = json.dumps({"starfruit_cache": [], "starfruit_spread_cache": [], "orchid_cache": [], "orchid_spread_cache": [], "sunlight_cache": [], "humidity_cache": [], "etf_returns": [], "assets_returns": [], "strawberries_returns": [], "strawberries_estimated_returns": [], "chocolate_returns": [], "chocolate_estimated_returns": [], "roses_returns": [], "roses_estimated_returns": [], "coconut_coupon_returns": [], "coconut_coupon_bsm_returns": [], "coconut_returns": [], "coconut_estimated_returns": []})
+            state.traderData = json.dumps({"starfruit_cache": [], "starfruit_spread_cache": [], "orchid_cache": [], "orchid_spread_cache": [], "sunlight_cache": [], "humidity_cache": [], "etf_returns": [], "assets_returns": [], "strawberries_returns": [], "strawberries_estimated_returns": [], "chocolate_returns": [], "chocolate_estimated_returns": [], "roses_returns": [], "roses_estimated_returns": [], "coconut_coupon_returns": [], "coconut_coupon_bsm_returns": [], "coconut_returns": [], "coconut_estimated_returns": [], "rhianna_buy": False, "rhianna_trade_before": False})
         
         traderDataDict = json.loads(state.traderData)
         self.starfruit_cache = traderDataDict["starfruit_cache"]
@@ -628,6 +666,9 @@ class Trader:
         self.coconut_estimated_returns = traderDataDict["coconut_estimated_returns"]
         self.coconut_coupon_returns = traderDataDict["coconut_coupon_returns"]
         self.coconut_coupon_bsm_returns = traderDataDict["coconut_coupon_bsm_returns"]
+
+        self.rhianna_buy = traderDataDict["rhianna_buy"]
+        self.rhianna_trade_before = traderDataDict["rhianna_trade_before"]
 
     def run(self, state: TradingState):
         # Update positions
@@ -952,6 +993,8 @@ class Trader:
 
         for product, orders in coconut_coupon_orders.items():
             result[product] = orders
+
+        result["ROSES"] = self.compute_roses_orders(state)
 
         traderData = self.marshalTraderData()
 
