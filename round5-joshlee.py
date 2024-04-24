@@ -180,6 +180,7 @@ class Trader:
 
         return orders
 
+    # Z-score based algo, fails when spikes in assets correspond to dips in etf during downtrends
     def compute_basket_orders2(self, state: TradingState):
         products = ["CHOCOLATE", "STRAWBERRIES", "ROSES", "GIFT_BASKET"]
         positions, buy_orders, sell_orders, best_bids, best_asks, prices, orders = {}, {}, {}, {}, {}, {}, {"CHOCOLATE": [], "STRAWBERRIES": [], "ROSES": [], "GIFT_BASKET": []}
@@ -445,6 +446,71 @@ class Trader:
 
         #     print("SELL", "ROSES", str(limit_mult) + "x", best_bids["ROSES"])
         #     orders["ROSES"].append(Order("ROSES", best_bids["ROSES"], limit_mult))
+
+        return orders
+
+    # Trend based algo
+    def compute_basket_orders3(self, state: TradingState):
+        products = ["CHOCOLATE", "STRAWBERRIES", "ROSES", "GIFT_BASKET"]
+        positions, buy_orders, sell_orders, best_bids, best_asks, prices, orders = {}, {}, {}, {}, {}, {}, {
+            "CHOCOLATE": [], "STRAWBERRIES": [], "ROSES": [], "GIFT_BASKET": []}
+
+        for product in products:
+            positions[product] = state.position[product] if product in state.position else 0
+
+            buy_orders[product] = state.order_depths[product].buy_orders
+            sell_orders[product] = state.order_depths[product].sell_orders
+
+            best_bids[product] = max(buy_orders[product].keys())
+            best_asks[product] = min(sell_orders[product].keys())
+
+            prices[product] = (best_bids[product] + best_asks[product]) / 2.0
+
+        estimated_price = 4.0 * prices["CHOCOLATE"] + 6.0 * prices["STRAWBERRIES"] + prices["ROSES"]
+
+        price_diff = prices["GIFT_BASKET"] - estimated_price
+
+        self.etf_returns.append(prices["GIFT_BASKET"])
+        # Using assets cache to store price difference instead of total component value
+        self.assets_returns.append(price_diff)
+
+        if len(self.etf_returns) < 100 or len(self.assets_returns) < 100:
+            return orders
+
+        # Slow moving average
+        assets_rolling_mean = statistics.fmean(self.assets_returns[-200:])
+        # Fast moving average
+        assets_rolling_mean_fast = statistics.fmean(self.assets_returns[-100:])
+
+        print(self.etf_returns[-1])
+
+        print(assets_rolling_mean_fast)
+        print(assets_rolling_mean)
+
+        # Empirically tuned to avoid noisy buy and sell signals - do nothing if sideways market
+        if assets_rolling_mean_fast > assets_rolling_mean + 4:
+
+            # Fixed entry every timestep that criteria is met, max-ing out early
+            limit_mult = 3
+
+            limit_mult = min(limit_mult, self.POSITION_LIMITS["GIFT_BASKET"] - positions["GIFT_BASKET"],
+                             self.POSITION_LIMITS["GIFT_BASKET"])
+
+            print("GIFT_BASKET positions:", positions["GIFT_BASKET"])
+            print("BUY", "GIFT_BASKET", str(limit_mult) + "x", best_asks["GIFT_BASKET"])
+            orders["GIFT_BASKET"].append(Order("GIFT_BASKET", best_asks["GIFT_BASKET"], limit_mult))
+
+        elif assets_rolling_mean_fast < assets_rolling_mean - 4:
+
+            # Fixed entry every timestep, max-ing out early
+            limit_mult = -3
+
+            limit_mult = max(limit_mult, -self.POSITION_LIMITS["GIFT_BASKET"] - positions["GIFT_BASKET"],
+                             -self.POSITION_LIMITS["GIFT_BASKET"])
+
+            print("GIFT_BASKET positions:", positions["GIFT_BASKET"])
+            print("SELL", "GIFT_BASKET", str(limit_mult) + "x", best_bids["GIFT_BASKET"])
+            orders["GIFT_BASKET"].append(Order("GIFT_BASKET", best_bids["GIFT_BASKET"], limit_mult))
 
         return orders
 
@@ -877,7 +943,7 @@ class Trader:
         # 6 strawberry, 4 choc and 1 rose in 1 basket
         # treasure chest 7500 seashells each
         # basket_orders = self.compute_basket_orders(state.order_depths)
-        basket_orders = self.compute_basket_orders2(state)
+        basket_orders = self.compute_basket_orders3(state)
 
         for product, orders in basket_orders.items():
             result[product] = orders
