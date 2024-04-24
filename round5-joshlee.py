@@ -632,6 +632,112 @@ class Trader:
 
         return orders
 
+    def compute_chocolate_orders(self, state: TradingState):
+        products = ["CHOCOLATE"]
+        positions, buy_orders, sell_orders, best_bids, best_asks, prices, orders = {}, {}, {}, {}, {}, {}, {
+            "CHOCOLATE": []}
+
+        for product in products:
+            positions[product] = state.position[product] if product in state.position else 0
+
+            buy_orders[product] = state.order_depths[product].buy_orders
+            sell_orders[product] = state.order_depths[product].sell_orders
+
+            best_bids[product] = max(buy_orders[product].keys())
+            best_asks[product] = min(sell_orders[product].keys())
+
+            prices[product] = (best_bids[product] + best_asks[product]) / 2.0
+
+        self.chocolate_returns.append(prices["CHOCOLATE"])
+
+        if len(self.chocolate_returns) < 100:
+            return orders
+
+        # Slow moving average
+        chocolate_rolling_mean = statistics.fmean(self.chocolate_returns[-200:])
+        # Fast moving average
+        chocolate_rolling_mean_fast = statistics.fmean(self.chocolate_returns[-100:])
+
+        # Empirically tuned to avoid noisy buy and sell signals - do nothing if sideways market
+        if chocolate_rolling_mean_fast > chocolate_rolling_mean + 1.5:
+
+            # Fixed entry every timestep that criteria is met, max-ing out early
+            limit_mult = 12
+
+            limit_mult = min(limit_mult, self.POSITION_LIMITS["CHOCOLATE"] - positions["CHOCOLATE"],
+                             self.POSITION_LIMITS["CHOCOLATE"])
+
+            print("CHOCOLATE positions:", positions["CHOCOLATE"])
+            print("BUY", "CHOCOLATE", str(limit_mult) + "x", best_asks["CHOCOLATE"])
+            orders["CHOCOLATE"].append(Order("CHOCOLATE", best_asks["CHOCOLATE"], limit_mult))
+
+        elif chocolate_rolling_mean_fast < chocolate_rolling_mean - 1.5:
+
+            # Fixed entry every timestep, max-ing out early
+            limit_mult = -12
+
+            limit_mult = max(limit_mult, -self.POSITION_LIMITS["CHOCOLATE"] - positions["CHOCOLATE"],
+                             -self.POSITION_LIMITS["CHOCOLATE"])
+
+            print("CHOCOLATE positions:", positions["CHOCOLATE"])
+            print("SELL", "CHOCOLATE", str(limit_mult) + "x", best_bids["CHOCOLATE"])
+            orders["CHOCOLATE"].append(Order("CHOCOLATE", best_bids["CHOCOLATE"], limit_mult))
+
+        return orders
+
+    def compute_strawberries_orders(self, state: TradingState):
+        products = ["STRAWBERRIES"]
+        positions, buy_orders, sell_orders, best_bids, best_asks, prices, orders = {}, {}, {}, {}, {}, {}, {
+            "STRAWBERRIES": []}
+
+        for product in products:
+            positions[product] = state.position[product] if product in state.position else 0
+
+            buy_orders[product] = state.order_depths[product].buy_orders
+            sell_orders[product] = state.order_depths[product].sell_orders
+
+            best_bids[product] = max(buy_orders[product].keys())
+            best_asks[product] = min(sell_orders[product].keys())
+
+            prices[product] = (best_bids[product] + best_asks[product]) / 2.0
+
+        self.strawberries_returns.append(prices["STRAWBERRIES"])
+
+        if len(self.strawberries_returns) < 100:
+            return orders
+
+        # Slow moving average
+        strawberries_rolling_mean = statistics.fmean(self.strawberries_returns[-200:])
+        # Fast moving average
+        strawberries_rolling_mean_fast = statistics.fmean(self.strawberries_returns[-100:])
+
+        # Empirically tuned to avoid noisy buy and sell signals - do nothing if sideways market
+        if strawberries_rolling_mean_fast > strawberries_rolling_mean + 1.5:
+
+            # Fixed entry every timestep that criteria is met, max-ing out early
+            limit_mult = 18
+
+            limit_mult = min(limit_mult, self.POSITION_LIMITS["STRAWBERRIES"] - positions["STRAWBERRIES"],
+                             self.POSITION_LIMITS["STRAWBERRIES"])
+
+            print("STRAWBERRIES positions:", positions["STRAWBERRIES"])
+            print("BUY", "STRAWBERRIES", str(limit_mult) + "x", best_asks["STRAWBERRIES"])
+            orders["STRAWBERRIES"].append(Order("STRAWBERRIES", best_asks["STRAWBERRIES"], limit_mult))
+
+        elif strawberries_rolling_mean_fast < strawberries_rolling_mean - 1.5:
+
+            # Fixed entry every timestep, max-ing out early
+            limit_mult = -18
+
+            limit_mult = max(limit_mult, -self.POSITION_LIMITS["STRAWBERRIES"] - positions["STRAWBERRIES"],
+                             -self.POSITION_LIMITS["STRAWBERRIES"])
+
+            print("STRAWBERRIES positions:", positions["STRAWBERRIES"])
+            print("SELL", "STRAWBERRIES", str(limit_mult) + "x", best_bids["STRAWBERRIES"])
+            orders["STRAWBERRIES"].append(Order("STRAWBERRIES", best_bids["STRAWBERRIES"], limit_mult))
+
+        return orders
+
     def marshalTraderData(self) -> str: 
         return json.dumps({"starfruit_cache": self.starfruit_cache, "starfruit_spread_cache": self.starfruit_spread_cache, "orchid_cache": self.orchid_cache, "orchid_spread_cache": [], "sunlight_cache": self.sunlight_cache, "humidity_cache": self.humidity_cache, "etf_returns": self.etf_returns, "assets_returns": self.assets_returns, "strawberries_returns": self.strawberries_returns, "strawberries_estimated_returns": self.strawberries_estimated_returns, "chocolate_returns": self.chocolate_returns, "chocolate_estimated_returns": self.chocolate_estimated_returns, "roses_returns": self.roses_returns, "roses_estimated_returns": self.roses_estimated_returns, "coconut_coupon_returns": self.coconut_coupon_returns, "coconut_coupon_bsm_returns": self.coconut_coupon_bsm_returns, "coconut_returns": self.coconut_returns, "coconut_estimated_returns": self.coconut_estimated_returns, "rhianna_buy": self.rhianna_buy, "rhianna_trade_before": self.rhianna_trade_before})
 
@@ -791,7 +897,7 @@ class Trader:
                     # if ((ask <= lower_bound) or ((self.positions[product] < 0) and (ask == lower_bound + 1))) and cur_position < self.POSITION_LIMITS[product]:
                         order_vol = min(-vol, self.POSITION_LIMITS[product] - cur_position)
                         cur_position += order_vol
-                        print("BUY", product, str(order_vol) + "x", ask)
+                        #print("BUY", product, str(order_vol) + "x", ask)
                         orders.append(Order(product, ask, order_vol))
 
                 undercut_market_ask = best_market_ask - 1
@@ -805,7 +911,7 @@ class Trader:
                 if cur_position < self.POSITION_LIMITS[product]:
                     order_vol = self.POSITION_LIMITS[product] - cur_position
                     cur_position += order_vol
-                    print("BUY", product, str(order_vol) + "x", own_bid)
+                    #print("BUY", product, str(order_vol) + "x", own_bid)
                     orders.append(Order(product, own_bid, order_vol))
 
                 cur_position = self.positions[product]
@@ -816,13 +922,13 @@ class Trader:
                     # if ((bid >= upper_bound) or ((self.positions[product] > 0) and (bid == upper_bound - 1))) and cur_position > -self.POSITION_LIMITS[product]:
                         order_vol = max(-vol, -self.POSITION_LIMITS[product] - cur_position)
                         cur_position += order_vol
-                        print("SELL", product, str(order_vol) + "x", bid)
+                        #print("SELL", product, str(order_vol) + "x", bid)
                         orders.append(Order(product, bid, order_vol))
 
                 if cur_position > -self.POSITION_LIMITS[product]:
                     order_vol = max(-self.POSITION_LIMITS[product], -self.POSITION_LIMITS[product] - cur_position)
                     cur_position += order_vol
-                    print("SELL", product, str(order_vol) + "x", own_ask)
+                    #print("SELL", product, str(order_vol) + "x", own_ask)
                     orders.append(Order(product, own_ask, order_vol))
 
             # sunlight less than 7 hour, production decrease 4% for every 10 min
@@ -992,6 +1098,16 @@ class Trader:
             result[product] = orders
 
         result["ROSES"] = self.compute_roses_orders(state)
+
+        chocolate_orders = self.compute_chocolate_orders(state)
+
+        for product, orders in chocolate_orders.items():
+            result[product] = orders
+
+        strawberries_orders = self.compute_strawberries_orders(state)
+
+        for product, orders in strawberries_orders.items():
+            result[product] = orders
 
         traderData = self.marshalTraderData()
 
